@@ -9,7 +9,9 @@ void doCycle(unsigned char n) {
 	for (i = 0; i < n; ++i) {
 		_delay_us(7);
 	}
-	PORTB &= 0xfe;
+	if (n != 75) {
+		PORTB &= 0xfe;
+	}
 	for (i = 0; i < 150-n; ++i) {
 		_delay_us(7);
 	}
@@ -36,8 +38,9 @@ ISR(INT0_vect)
 		} else {
 			speed = v - 150;
 		}
-		if (speed > 75) {
+		if (speed > 65 && speed < 85) {
 			PORTB |= 0x02;
+			speed = 75;
 		} else {
 			PORTB &= 0xfd;
 		}

@@ -18,7 +18,7 @@
 # FUSES ........ Parameters for avrdude to flash the fuses appropriately.
 
 DEVICE     = at90s2313
-CLOCK      = 8000000
+CLOCK      = 10000000
 PROGRAMMER = -c usbtiny
 OBJECTS    = main.o
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
