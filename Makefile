@@ -17,8 +17,9 @@
 #                   default_serial = "avrdoper"
 # FUSES ........ Parameters for avrdude to flash the fuses appropriately.
 
-DEVICE     = at90s2313
-CLOCK      = 10000000
+#DEVICE     = at90s2313
+DEVICE     = attiny85
+CLOCK      = 8000000
 PROGRAMMER = -c usbtiny
 OBJECTS    = main.o
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m

@@ -2,64 +2,80 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 
+#define MAX_SPEED (250)
+#define STOP_SPEED (125)
+
 void doCycle(unsigned char n) {
-	PORTB |= 0x01;
+	PORTB |= (1 << PB3);
 	_delay_us(1000);
 	int i;
 	for (i = 0; i < n; ++i) {
-		_delay_us(7);
+		_delay_us(4);
 	}
-	if (n != 75) {
-		PORTB &= 0xfe;
+	if (n != STOP_SPEED) {
+		PORTB &= ~(1 << PB3);
 	}
-	for (i = 0; i < 150-n; ++i) {
-		_delay_us(7);
+	for (i = 0; i < MAX_SPEED - n; ++i) {
+		_delay_us(4);
 	}
 	_delay_ms(18);
 }
 
-unsigned char interrupt_state = 0;
-unsigned char interrupt_count = 0;
 unsigned char speed = 0;
+unsigned char high = 0;
+
+ISR(TIMER1_OVF_vect)
+{
+	++high;
+}
 
 ISR(INT0_vect)
 {
-
-	interrupt_state ^= 0xff;
 	if (MCUCR != 0x03) {
+		// turn the debug light off
+		PORTB &= ~(1 << PB4);
 		MCUCR=0x03;
-		unsigned char low = TCNT1L;
-		unsigned char high = TCNT1H;
-		unsigned short v = ((TCNT1H << 8) | TCNT1L);
-		if (v > 150 + 150) {
-			speed = 150;
-		} else if (v < 150) {
+		unsigned char low = TCNT1;
+		unsigned short v = ((high << 8) | low);
+		if (v > MAX_SPEED + MAX_SPEED) {
+			speed = MAX_SPEED;
+		} else if (v < MAX_SPEED) {
 			speed = 0;
 		} else {
-			speed = v - 150;
+			speed = v - MAX_SPEED;
 		}
-		if (speed > 65 && speed < 85) {
-			PORTB |= 0x02;
-			speed = 75;
-		} else {
-			PORTB &= 0xfd;
+		if (speed > 115 && speed < 135) {
+			PORTB |= (1 << PB4);
+			speed = STOP_SPEED;
 		}
 	} else {
 		MCUCR=0x02;
-		TCNT1H = 0;
-    		TCNT1L = 0;
+		high = 0;
+    		TCNT1 = 0;
 	}
 }
 
+/**
+ * For the tiny85, PB2 (pin 7) is the RX input, PB3 (pin 2) is the servo output, and PB0 (pin 5, PCINT0) is reserved for the sensor input
+ * PB4 (pin 3) is the diagnostic LED output
+ */
 int main(void)
 {
-    DDRB = 0x03;
-    PORTB = 0x02;
-    DDRD = 0x00;
+// set the clock prescaler to 1 to get us an 8MHz clock
+    CLKPR = 0x80;
+    CLKPR = 0x00;
+    DDRB = (1 << DDB4) | (1 << DDB3);
+    PORTB = 0x00;
     MCUCR = 0x03;
-    GIMSK = 0x40;
-    TCCR1B = 0x03; // CK/64
+    GIMSK = (1 << INT0);
+    TIMSK = (1 << TOIE1); // enable counter 1 overflow interrupt
+    PCMSK = 0x00; // will be 0x01 when we have sensor input?
+    TCCR1 = 0x06; // CK/32
     sei();
+    /*for (;;) {
+	_delay_ms(500);
+	PORTB ^= 0x28;
+    }*/
     for(;;){
 	unsigned char i;
 	for (i = 0; i < 255; ++i) {
