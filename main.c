@@ -33,7 +33,7 @@ ISR(INT0_vect)
 {
 	if (MCUCR != 0x03) {
 		// turn the debug light off
-		PORTB &= ~(1 << PB4);
+	//	PORTB &= ~(1 << PB4);
 		MCUCR=0x03;
 		unsigned char low = TCNT1;
 		unsigned short v = ((high << 8) | low);
@@ -45,7 +45,7 @@ ISR(INT0_vect)
 			speed = v - MAX_SPEED;
 		}
 		if (speed > 115 && speed < 135) {
-			PORTB |= (1 << PB4);
+	//		PORTB |= (1 << PB4);
 			speed = STOP_SPEED;
 		}
 	} else {
@@ -55,8 +55,30 @@ ISR(INT0_vect)
 	}
 }
 
+unsigned char rot_high = 0;
+
+ISR(TIMER0_OVF_vect)
+{
+	++rot_high;
+	if (rot_high > 10) {
+		PORTB &= ~(1 << PB4);
+	}
+}
+unsigned char rotation_count = 0;
+
+ISR(ANA_COMP_vect)
+{
+	unsigned short t = (rot_high << 8) + TCNT0;
+	PORTB &= ~(1 << PB4);
+	if (t < 500) {
+		PORTB |= (1 << PB4);
+	}
+	rot_high = 0;
+	TCNT0 = 0;
+}
+
 /**
- * For the tiny85, PB2 (pin 7) is the RX input, PB3 (pin 2) is the servo output, and PB0 (pin 5, PCINT0) is reserved for the sensor input
+ * For the tiny85, PB2 (pin 7) is the RX input, PB3 (pin 2) is the servo output, and PB1 (pin 6, AIN1) is reserved for the sensor input
  * PB4 (pin 3) is the diagnostic LED output
  */
 int main(void)
@@ -66,11 +88,13 @@ int main(void)
     CLKPR = 0x00;
     DDRB = (1 << DDB4) | (1 << DDB3);
     PORTB = 0x00;
-    MCUCR = 0x03;
+    ACSR = (1 << ACBG) | (1 << ACIE);
+    MCUCR = 0x03; // look for rising edge on INT0
     GIMSK = (1 << INT0);
-    TIMSK = (1 << TOIE1); // enable counter 1 overflow interrupt
+    TIMSK = (1 << TOIE1) | (1 << TOIE0); // enable counter 1 and 0  overflow interrupts
     PCMSK = 0x00; // will be 0x01 when we have sensor input?
     TCCR1 = 0x06; // CK/32
+    TCCR0B = 0x03; // CK/64
     sei();
     /*for (;;) {
 	_delay_ms(500);
