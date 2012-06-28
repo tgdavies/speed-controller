@@ -51,13 +51,49 @@ void clearDebugChars() {
 	}
 }
 
-void log8(uint8_t n) {
-	debugChars[0] = hexDigit(n >> 4);
-	debugChars[1] = hexDigit(n & 0x0F);
-	debugChars[2] = '\r';
-	debugChars[3] = '\n';
-	sendDebug = 1;
+uint8_t debugIndex(uint8_t sizeNeeded) {
+	uint8_t i = 0;
+	while (i < DEBUG_CHARS_SIZE && debugChars[i] != 0)
+		++i;
+	if (DEBUG_CHARS_SIZE - i >= sizeNeeded) {
+		sendDebug = 1;
+		return i;
+	} else {
+		return 0xff;
+	}
 }
+
+void log8(uint8_t n) {
+	uint8_t i = debugIndex(2);
+	if (i != 0xff) {
+		debugChars[i++] = hexDigit(n >> 4);
+		debugChars[i] = hexDigit(n & 0x0F);
+	}
+}
+
+void log16(uint16_t n) {
+	uint8_t i = debugIndex(4);
+	if (i != 0xff) {
+		log8(n >> 8);
+		log8(n & 0xFF);
+	}
+}
+
+logSep() {
+	uint8_t i = debugIndex(1);
+	if (i != 0xff) {
+		debugChars[i] = ',';
+	}
+}
+
+logCRNL() {
+	uint8_t i = debugIndex(2);
+	if (i != 0xff) {
+		debugChars[i++] = '\r';
+		debugChars[i] = '\n';
+	}
+}
+
 
 void softUartSendString (char *txData) 
 { 
@@ -88,18 +124,19 @@ void debugToggle() {
 //! Parameters for regulator
 struct PID_DATA pidData;
 
-#define MAX_SPEED INT16_C(240)
-#define STOP_SPEED INT16_C(120)
+#define MAX_SPEED INT16_C(250)
+#define STOP_SPEED INT16_C(125)
+#define DEAD_BAND (5)
 
 #define MAX_RPS INT16_C(100)
 // controller input value after confining to 0..MAX_SPEED
 int16_t speed = 0;
 
 // time to drive the motor in multiples of 4us
-int16_t drive = STOP_SPEED;
+uint16_t drive = STOP_SPEED;
 
-int16_t actual_revs_per_second = 0;
-int16_t desired_revs_per_second = 0;
+uint16_t actual_revs_per_second = 0;
+uint16_t desired_revs_per_second = 0;
 
 #define AHEAD 1
 #define ASTERN 2
@@ -112,7 +149,7 @@ void doCycle() {
 		debugOff();
 	}*/
     PORTB |= (1 << PB3);
-    _delay_us(1000);
+    _delay_us(1020);
     uint8_t i;
     for (i = 0; i < drive; ++i) {
         _delay_us(4);
@@ -128,6 +165,7 @@ void doCycle() {
 			softUartSendChar(debugChars[i]);
 		}
 		sendDebug = 0;
+		clearDebugChars();
 	} else {
 	    _delay_ms(18);
 	}
@@ -140,6 +178,7 @@ ISR(TIMER1_OVF_vect)
 {
     ++high;
 }
+uint16_t error = 0;
 
 ISR(INT0_vect)
 {
@@ -156,19 +195,30 @@ ISR(INT0_vect)
         } else {
             speed = v - MAX_SPEED;
         }
-        if (speed > 110 && speed < 130) {
+
+        if (speed > STOP_SPEED-DEAD_BAND && speed < STOP_SPEED+DEAD_BAND) {
             speed = drive = STOP_SPEED;
             desired_revs_per_second = 0;
             desired_direction = 0;
             //debugOn();
-        } else if (speed > 130) {
+        } else if (speed >= STOP_SPEED+DEAD_BAND) {
             desired_revs_per_second = ((speed - 130) * MAX_RPS) / (MAX_SPEED - 130);
             desired_direction = AHEAD;
-        } else if (speed < 110) {
-            desired_revs_per_second = ((110-speed) * MAX_RPS) / 110;
+        } else if (speed <= STOP_SPEED-DEAD_BAND) {
+            desired_revs_per_second = ((120-speed) * MAX_RPS) / 120;
             desired_direction = ASTERN;
         }
-        log8(speed);
+
+        clearDebugChars();
+        //log8(speed);
+        //logSep();
+        log8(desired_revs_per_second & 0xff);
+        logSep();
+        log8(actual_revs_per_second & 0xff);
+        //log8(v & 0xff);
+        //logSep();
+        //log8(error & 0xff);
+        logCRNL();
 		if (desired_revs_per_second == 0) {
 		}
     } else {
@@ -254,13 +304,11 @@ int main(void)
 				} else {
 					drive = MAX_SPEED/2 - drive;
 				}
-				uint16_t d = desired_revs_per_second - actual_revs_per_second;
-				if (d < 0) {
-					d = -d;
+				error = desired_revs_per_second - actual_revs_per_second;
+				if (error < 0) {
+					error = -error;
 				}
-				if (desired_revs_per_second > actual_revs_per_second) {
-					debugOn();
-				}
+				
 			}
             doCycle();
     }
