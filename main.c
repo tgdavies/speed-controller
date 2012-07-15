@@ -2,7 +2,6 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <stdint.h>
-#include "pid.h"
 
 #define UART_SOFT_DDR DDRB 
 #define UART_SOFT_PORT PORTB 
@@ -21,7 +20,6 @@ char debugChars[DEBUG_CHARS_SIZE];
 uint8_t sendDebug = 0;
 
 void softUartSendChar(char txData) { 
-     //txData = ~txData; 
      UART_SOFT_PORT &= ~(1<<UART_SOFT_PIN); 
      _delay_us(UART_SOFT_DELAY_US); 
    for (char i=0; i<8; i++) 
@@ -79,14 +77,14 @@ void log16(uint16_t n) {
 	}
 }
 
-logSep() {
+void logSep() {
 	uint8_t i = debugIndex(1);
 	if (i != 0xff) {
 		debugChars[i] = ',';
 	}
 }
 
-logCRNL() {
+void logCRNL() {
 	uint8_t i = debugIndex(2);
 	if (i != 0xff) {
 		debugChars[i++] = '\r';
@@ -112,23 +110,11 @@ void debugToggle() {
     //PORTB ^= (1 << PB4);
 }
 
-/*! \brief P, I and D parameter values
- *
- * The K_P, K_I and K_D values (P, I and D gains)
- * need to be modified to adapt to the application at hand
- */
-#define K_P     0.20
-#define K_I     0.10
-#define K_D     0.00
-
-//! Parameters for regulator
-struct PID_DATA pidData;
-
 #define MAX_SPEED INT16_C(250)
 #define STOP_SPEED INT16_C(125)
 #define DEAD_BAND (5)
 
-#define MAX_RPS INT16_C(100)
+#define MAX_RPS INT16_C(200)
 // controller input value after confining to 0..MAX_SPEED
 int16_t speed = 0;
 
@@ -141,6 +127,31 @@ uint16_t desired_revs_per_second = 0;
 #define AHEAD 1
 #define ASTERN 2
 uint8_t desired_direction = 0;
+
+// init vars
+  int processValue = 0; // holds the actual speed (RPS)
+  int setPoint; // holds the desired speed (RPS)
+
+
+  // the tuning constants -----------------------------------
+
+  int PFactor = 3; // the Proportional tuning constant
+  int IFactor = 5; // the Integral tuning constant
+  int DFactor = 0; // the Derivative tuning constant
+ //----------------------------------------------------------
+
+  int error = 0;
+  int Pterm = 0;
+  int Iterm = 0;
+  int Dterm = 0;
+  int lastProcessValue = 0;
+  int lastSetPoint = 0;
+  int sumError = 0;
+  int DprocessValue = 0;
+  int firstExecution = 0;
+  int initialError = 0;
+
+  int output;
 
 void doCycle() {
 	/*if (drive != 0) {
@@ -178,7 +189,7 @@ ISR(TIMER1_OVF_vect)
 {
     ++high;
 }
-uint16_t error = 0;
+uint16_t debug_error = 0;
 
 ISR(INT0_vect)
 {
@@ -214,7 +225,7 @@ ISR(INT0_vect)
         //logSep();
         log8(desired_revs_per_second & 0xff);
         logSep();
-        log8(actual_revs_per_second & 0xff);
+        log16(actual_revs_per_second);
         //log8(v & 0xff);
         //logSep();
         //log8(error & 0xff);
@@ -256,6 +267,86 @@ ISR(ANA_COMP_vect)
 }
 
 
+  
+void pidInit() {
+	error = 0;
+	Pterm = 0;
+	Iterm = 0;
+	Dterm = 0;
+	lastProcessValue = 0;
+	lastSetPoint = 0;
+	sumError = 0;
+	DprocessValue = 0;
+	firstExecution = 0;
+	initialError = 0;
+}
+
+void pidController() {
+    error = setPoint - processValue;
+    sumError = sumError + error;
+
+    // >>> calculate Iterm
+    // --------------------
+    Iterm = IFactor * sumError; // <---- scaled
+
+    // first time through
+    if (firstExecution < 1){
+
+      if (firstExecution == 0){
+        //sumError = Manual_value / Ifactor
+        firstExecution = 1;
+        initialError = error;
+      }
+
+      // wait for error to over correct via Iterm
+      // before going on to normal operation
+      if ( (initialError > 0 && error < 0) || (initialError < 0 && error > 0) ) {
+        firstExecution = 2;
+        lastProcessValue = processValue;
+      }
+
+      lastSetPoint = setPoint;
+
+    // normal operation
+    } else if (processValue >= 0) {
+
+      // >>> calculate Dterm
+      // -------------------
+      DprocessValue = lastProcessValue - processValue;
+      lastProcessValue = processValue;
+
+      Dterm = DFactor * DprocessValue; // <--- scaled
+
+
+      if (setPoint == lastSetPoint) {
+        // setpoint has not changed
+
+        // >>> calculate Pterm
+        // -------------------
+        Pterm = PFactor * error; // <--- scaled
+
+      } else {
+        // setPoint has changed
+
+        // reset PD terms
+        Pterm = 0;
+        Dterm = 0;
+
+        if (setPoint > lastSetPoint && processValue > setPoint){
+          lastSetPoint = setPoint;
+          lastProcessValue = processValue;
+        }
+        if (setPoint < lastSetPoint && processValue < setPoint){
+          lastSetPoint = setPoint;
+          lastProcessValue = processValue;
+        }
+      } // close (setpoint == lastsetpoint) else
+
+    }// close else if (precessValue >= 0)
+
+
+    output = ((Pterm + Iterm + Dterm) / 100); // <--- scaled back down
+}
 
 /**
  * For the tiny85, PB2 (pin 7) is the RX input, PB3 (pin 2) is the servo output, and PB1 (pin 6, AIN1) is reserved for the sensor input
@@ -275,7 +366,7 @@ int main(void)
     TCCR1 = 0x06; // CK/32, i.e. 250KHz, or 976Hz overflow interrupt.
     TCCR0B = 0x05; // CK/1024 i.e. 7812.5 Hz or 30Hz overflow interrupt.
     
-    pid_Init(K_P * SCALING_FACTOR, K_I * SCALING_FACTOR , K_D * SCALING_FACTOR , &pidData);
+    pidInit();
 
     sei();
 	uint8_t pid_cycle_counter = 0;
@@ -283,30 +374,39 @@ int main(void)
     for(;;){
             ++pid_cycle_counter;
 			if (desired_direction == 0) {
-				pid_Init(K_P * SCALING_FACTOR, K_I * SCALING_FACTOR , K_D * SCALING_FACTOR , &pidData);
+			    pidInit();
+			    output = 0;
 			}
-			if (pid_cycle_counter > 10 && speed != STOP_SPEED) { // do this every 200ms
+			if (pid_cycle_counter > 2 && speed != STOP_SPEED) { // do this every 200ms
 				debugOff();
 				pid_cycle_counter = 0;
 				if (desired_direction != previous_desired_direction) {
-				    pid_Init(K_P * SCALING_FACTOR, K_I * SCALING_FACTOR , K_D * SCALING_FACTOR , &pidData);
+				    pidInit();
 				    previous_desired_direction = desired_direction;
+				    output = 0;
 				}
-				drive = pid_Controller(desired_revs_per_second, actual_revs_per_second, &pidData);
+				setPoint = desired_revs_per_second;
+				processValue = actual_revs_per_second;
+				//pidController();
+				if (desired_revs_per_second < actual_revs_per_second) {
+					--output;
+				} else if (desired_revs_per_second > actual_revs_per_second) {
+					++output;
+				}
 				
-				if (drive > MAX_SPEED/2) {
-					drive = MAX_SPEED/2;
-				} else if (drive <= 0) {		
-					drive = 0;
+				if (output > MAX_SPEED/2) {
+					output = MAX_SPEED/2;
+				} else if (output <= 0) {		
+					output = 0;
 				}
 				if (desired_direction == AHEAD) {
-					drive = drive + MAX_SPEED/2;
+					drive = output + MAX_SPEED/2;
 				} else {
-					drive = MAX_SPEED/2 - drive;
+					drive = MAX_SPEED/2 - output;
 				}
-				error = desired_revs_per_second - actual_revs_per_second;
-				if (error < 0) {
-					error = -error;
+				debug_error = desired_revs_per_second - actual_revs_per_second;
+				if (debug_error < 0) {
+					debug_error = -debug_error;
 				}
 				
 			}
