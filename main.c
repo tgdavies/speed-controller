@@ -5,7 +5,7 @@
 
 #define UART_SOFT_DDR DDRB 
 #define UART_SOFT_PORT PORTB 
-#define UART_SOFT_PIN PB4
+#define UART_SOFT_PIN PB1
 #define UART_SOFT_BAUD (4800)
 
 #define UART_SOFT_DELAY_US (int)(1000000.0/((float) UART_SOFT_BAUD)+0.5) 
@@ -352,18 +352,39 @@ void pidController() {
  * For the tiny85, PB2 (pin 7) is the RX input, PB3 (pin 2) is the servo output, and PB1 (pin 6, AIN1) is reserved for the sensor input
  * PB4 (pin 3) is the diagnostic LED output
  */
+
+#define RX_DD	(DDB2)
+#define RX_P	(PB2) // Must be INT0 pin
+#define MOTOR_DD (DDB0)
+#define MOTOR_P (PB0)
+#define SENSOR_DD (DDA2)
+#define SENSOR_P (PA2) // Must be AIN1
+#define LED1_DD (DDA1)
+#define LED1_P (PA1)
+#define LED2_DD (DDA0)
+#define LED2_P (PA0)
+
+#define ISC0_RISE (0x03)
+#define ISC0_FALL (0x02)
+
 int main(void)
 {
-// set the clock prescaler to 1 to get us an 8MHz clock
-    CLKPR = 0x80;
+// set the clock prescaler to 1 to get us an 8MHz clock -- the CKDIV8 fuse is programmed by default, so initial prescaler is /8
+    CLKPR = (1 << CLKPCE);
     CLKPR = 0x00;
-    DDRB = (1 << DDB4) | (1 << DDB3); // outputs for servo and diagnostic LED
+    DDRB = (1 << MOTOR_DD); // outputs for servo
+    DDRA = 3; //(1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs
+    PORTA = 0x00;
     PORTB = 0x00;
-    ACSR = (1 << ACBG) | (1 << ACIE); // analog comparator interrupt on toggle
-    MCUCR = 0x03; // look for rising edge on INT0
+    for (;;) {
+    }
+    // set the analog comparator to use the internal reference and enable interrupt on toggle
+    ACSR = (1 << ACBG) | (1 << ACIE);
+    MCUCR = ISC0_RISE; // look for rising edge on INT0
+    // enable interrupt INT0
     GIMSK = (1 << INT0);
-    TIMSK = (1 << TOIE1) | (1 << TOIE0); // enable counter 1 and 0  overflow interrupts
-    TCCR1 = 0x06; // CK/32, i.e. 250KHz, or 976Hz overflow interrupt.
+   // TIMSK = (1 << TOIE1) | (1 << TOIE0); // enable counter 1 and 0  overflow interrupts
+   // TCCR1 = 0x06; // CK/32, i.e. 250KHz, or 976Hz overflow interrupt.
     TCCR0B = 0x05; // CK/1024 i.e. 7812.5 Hz or 30Hz overflow interrupt.
     
     pidInit();
