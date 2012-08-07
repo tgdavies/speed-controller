@@ -246,14 +246,17 @@ ISR(INT0_vect)
 		uint16_t v = TCNT1L;
         v += TCNT1H << 8;
 		v = timer_diff(rx_signal_start_time, v);
-        if (v > RX_COUNTS_PER_MS*2) {
+		red(0);
+		if (v >  RX_COUNTS_PER_MS*3) { // invalid
+			speed = RX_COUNT_STOP;
+			red(1);
+        } else if (v > RX_COUNTS_PER_MS*2) {
             speed = RX_COUNTS_PER_MS;
         } else if (v < RX_COUNTS_PER_MS) {
             speed = 0;
         } else {
             speed = v - RX_COUNTS_PER_MS;
         }
-            red(0);
 
         if (speed > RX_COUNT_STOP-RX_COUNT_DEAD_BAND && speed < RX_COUNT_STOP+RX_COUNT_DEAD_BAND) {
             speed = RX_COUNT_STOP;
@@ -268,7 +271,6 @@ ISR(INT0_vect)
         } else if (speed <= RX_COUNT_STOP-RX_COUNT_DEAD_BAND) {
             desired_revs_per_second = (((RX_COUNT_STOP-RX_COUNT_DEAD_BAND)-speed) * MAX_RPS) / (RX_COUNT_STOP-RX_COUNT_DEAD_BAND);
             desired_direction = ASTERN;
-            red(1);
         }
 
         /*clearDebugChars();
