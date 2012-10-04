@@ -166,8 +166,6 @@ volatile uint16_t desired_revs_per_second = 0;
 #define AHEAD 1
 #define ASTERN 2
 volatile uint8_t desired_direction = 0;
-
-int output;
   
 #define BIT_DELAY_US(d,n) if (d & n) { _delay_us(n); }
 
@@ -183,17 +181,10 @@ void delay_us(uint16_t delay) {
 	BIT_DELAY_US(delay, 0x02);
 }
 void doCycle() {
-	/*if (drive != 0) {
-		debugOn();
-	} else {
-		debugOff();
-	}*/
     PORTB |= (1 << MOTOR_P);
     _delay_us(1000);
     delay_us(drive * 4);
-    //if (speed != RX_COUNT_STOP) { // this is the processed controller input, not the PID value
-        PORTB &= ~(1 << MOTOR_P);
-    //}
+    PORTB &= ~(1 << MOTOR_P);
     delay_us((MAX_SPEED - drive) * 4);
     /*if (sendDebug) {
 		for (i = 0; i < DEBUG_CHARS_SIZE; ++i) {
@@ -264,7 +255,6 @@ void process_rx_result() {
 
         if (speed > RX_COUNT_STOP-RX_COUNT_DEAD_BAND && speed < RX_COUNT_STOP+RX_COUNT_DEAD_BAND) {
             speed = RX_COUNT_STOP;
-            //drive = STOP_SPEED;
             desired_revs_per_second = 0;
             desired_direction = 0;
             //debugOn();
@@ -285,16 +275,10 @@ void process_rx_result() {
 }
 
 uint16_t rev_time_start = 0;
-uint8_t valid_revs = 0;
 uint8_t rev_timer_overflow_count = 0;
 
 ISR(TIM1_OVF_vect) {
-	//valid_revs = rev_time_start == 0;
-	//rev_time_start = 0;
-	//actual_revs_per_second = 0;
 	++rev_timer_overflow_count;
-	
-	//red(0);
 }
 
 uint16_t sensor_start_time = 0;
@@ -307,7 +291,6 @@ ISR(ANA_COMP_vect)
     ++rotation_count;
 	if (rotation_count == ROTATIONS_PER_CALC * 2) { // we've done 1 revolutions, see how long it took in 1/125000ths of a second
         rotation_count = 0;
-        valid_revs = 0;
         sensor_end_time = TCNT1L;
         sensor_end_time += TCNT1H << 8;
         sensor_start_time = rev_time_start;
@@ -322,12 +305,10 @@ uint8_t average_index = 0;
 void process_sensor_result() {
 	if (rev_timer_overflow_count > 1) {
 		actual_revs_per_second = 0;
-		valid_revs = 1;
 		sensor_start_time = 0;
 		sensor_end_time = 0;
 	} else if (sensor_start_time != 0 && sensor_end_time != 0) {
-		valid_revs = 1;
-		uint16_t actual_time_per_rev = timer_diff(sensor_start_time, sensor_end_time);			
+		uint16_t actual_time_per_rev = timer_diff(sensor_start_time, sensor_end_time);
 		actual_time_per_rev >>= 2;
 		//actual_revs_per_second = (ROTATIONS_PER_CALC * UINT16_C(125000/4)) / actual_time_per_rev;
 		actual_revs_history[average_index++] = (ROTATIONS_PER_CALC * UINT16_C(125000/4)) / actual_time_per_rev;
@@ -345,11 +326,11 @@ void process_sensor_result() {
  */
 int main(void)
 {
-// set the clock prescaler to 1 to get us an 8MHz clock -- the CKDIV8 fuse is programmed by default, so initial prescaler is /8
+    // set the clock prescaler to 1 to get us an 8MHz clock -- the CKDIV8 fuse is programmed by default, so initial prescaler is /8
     CLKPR = 0x80;
     CLKPR = 0x00;
     DDRB = (1 << MOTOR_DD); // outputs for servo
-    DDRA = 3; //(1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs
+    DDRA = (1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs
     PORTA = 0x00;
     PORTB = 0x00;
     
@@ -360,14 +341,13 @@ int main(void)
     GIMSK = (1 << INT0);
     TIMSK1 = (1 << TOIE1) /*| (1 << OCIE1A) | (1 << OCIE1B)*/; // enable counter 1 overflow interrupt
     TCCR1B = 0x03; // CK/64, i.e. 125KHz, or 488Hz MSB or 1.9Hz overflow.
-    //TCCR0B = 0x05; // CK/1024 i.e. 7812.5 Hz or 30Hz overflow interrupt.
     red(1);
     green(1);
 	drive = MAX_SPEED/2;
 	// initialise the ESC with a central setting
-			for (int i = 0; i < 120; ++i) {
-            	doCycle();
-            }
+    for (int i = 0; i < 120; ++i) {
+        doCycle();
+    }
     sei();
     green(0);
     red(0);
@@ -380,76 +360,62 @@ int main(void)
     uint16_t previous_desired_revs_per_second = 0;
     int16_t integral = 0;
     uint8_t f1, f2;
-    for(;;){
-				process_rx_result();
-    			process_sensor_result();
-    			//desired_direction = AHEAD;
-    		//desired_revs_per_second = 15;
-            ++pid_cycle_counter;
-			
-			if (pid_cycle_counter > 1) { // do this every 100ms
-				debugOff();
-				pid_cycle_counter = 0;
-				if (desired_direction != previous_desired_direction) {
-				    //pidInit();
-				    previous_desired_direction = desired_direction;
-				    output = 0;
-				    integral = 0;
-				}
-				if (previous_desired_revs_per_second != desired_revs_per_second) {
-					//integral = 0;
-					previous_desired_revs_per_second = desired_revs_per_second;
-				}
+    for (; ;) {
+        process_rx_result();
+        process_sensor_result();
+        //desired_direction = AHEAD;
+        //desired_revs_per_second = 15;
+        ++pid_cycle_counter;
 
-				int8_t diff = desired_revs_per_second - actual_revs_per_second;
-				if (diff < 0) diff = -diff;
-				green(diff < 5);
-				red(diff < 10);
-				if (diff > 5) {
-					int8_t delta = (diff >> 3) + 1;
-					if (desired_revs_per_second < actual_revs_per_second) {
-						integral -= delta;
-					} else if (desired_revs_per_second > actual_revs_per_second) {
-						integral += delta;
-					}
-				}
-				if (integral < 0) integral = 0;
-				int16_t total = desired_revs_per_second * 0.5 + integral;
-				if (total < 0) {
-					total = 0;
-				} else if (total > MAX_SPEED/2) {
-					total = MAX_SPEED/2;
-				}
-				
-				output = total;
-				
-				/*if (output < total) {
-					++output;
-				} else if (output > total) {
-					--output;
-				}*/
-				if (output > MAX_SPEED/2) {
-					output = MAX_SPEED/2;
-				} else if (output < 0) {		
-					output = 0;
-				}
-				if (actual_revs_per_second > 12) {
-					f1 = !f1;
-					}
-				if (actual_revs_per_second > 15) {
-					f2 = !f2;
-				}
-				
-				if (desired_direction == AHEAD) {
-					drive = output + MAX_SPEED/2;
-				} else if (desired_direction == ASTERN) {
-					drive = MAX_SPEED/2 - output;
-				} else {
-					drive = STOP_SPEED;
-				}
-			}			
-			//drive = MAX_SPEED/2 + 15;
-            doCycle();
+        if (pid_cycle_counter > 1) { // do this every 40ms
+            debugOff();
+            pid_cycle_counter = 0;
+            if (desired_direction != previous_desired_direction) {
+                //pidInit();
+                previous_desired_direction = desired_direction;
+                integral = 0;
+            }
+            if (previous_desired_revs_per_second != desired_revs_per_second) {
+                //integral = 0;
+                previous_desired_revs_per_second = desired_revs_per_second;
+            }
+
+            int8_t diff = desired_revs_per_second - actual_revs_per_second;
+            if (diff < 0) diff = -diff;
+            green(diff < 5);
+            red(diff < 10);
+            if (diff > 5) { // don't react to noise
+                int8_t delta = (diff >> 3) + 1;
+                if (desired_revs_per_second < actual_revs_per_second) {
+                    integral -= delta;
+                } else if (desired_revs_per_second > actual_revs_per_second) {
+                    integral += delta;
+                }
+            }
+            if (integral < 0) { // WHY DOES THIS HELP?!?
+                integral = 0;
+            }
+            int16_t total = (desired_revs_per_second >> 1) + integral;
+            
+            // restrict value to the allowed range
+            if (total < 0) {
+                total = 0;
+            } else if (total > MAX_SPEED / 2) {
+                total = MAX_SPEED / 2;
+            }
+
+            
+            // convert to an ESC output value, depending on current direction
+            if (desired_direction == AHEAD) {
+                drive = total + MAX_SPEED / 2;
+            } else if (desired_direction == ASTERN) {
+                drive = MAX_SPEED / 2 - total;
+            } else {
+                drive = STOP_SPEED;
+            }
+        }
+        //drive = MAX_SPEED/2 + 15;
+        doCycle();
     }
     return 0;   /* never reached */
 }
