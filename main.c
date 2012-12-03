@@ -11,7 +11,7 @@
 #define MOTOR2_P (PA7)
 #define SENSOR_DD (DDA2)
 #define SENSOR2_DD (DDA3)
-#define SENSOR_P (PA2) // Must be AIN1
+#define SENSOR_P (PA2)
 #define SENSOR2_P (PA3) // does that work?
 #define LED1_DD (DDA1)
 #define LED1_P (PA1)
@@ -306,29 +306,29 @@ uint16_t sensor_start_time = 0;
 uint16_t sensor_end_time = 0;
 
 #define ROTATIONS_PER_CALC	UINT16_C(1)
-ISR(ANA_COMP_vect)
+ISR(PCINT0_vect)
 {
-	static uint8_t rotation_count = 0;
-	static uint16_t start_time = 0;
-	static uint16_t end_time = 0;
-	static uint8_t counter = 0;
-    end_time = TCNT1L;
-    end_time += TCNT1H << 8;
-    if (start_time != 0) {
-    	uint16_t diff = timer_diff(start_time, end_time);
-    	if (diff > 50) {
-    		//red((counter++) & 0x01);
-			++rotation_count;
-			if (rotation_count == 6) { // we've done 1 revolutions, see how long it took in 1/125000ths of a second
-				rotation_count = 0;
-				sensor_end_time = end_time;
-				sensor_start_time = rev_time_start;
-				rev_time_start = sensor_end_time;
-				rev_timer_overflow_count = 0;
-			}   
+		static uint8_t rotation_count = 0;
+		static uint16_t start_time = 0;
+		static uint16_t end_time = 0;
+		static uint8_t counter = 0;
+		end_time = TCNT1L;
+		end_time += TCNT1H << 8;
+		if (start_time != 0) {
+			uint16_t diff = timer_diff(start_time, end_time);
+			if (diff > 50) {
+				//red((counter++) & 0x01);
+				++rotation_count;
+				if (rotation_count == 6) { // we've done 1 revolutions, see how long it took in 1/125000ths of a second
+					rotation_count = 0;
+					sensor_end_time = end_time;
+					sensor_start_time = rev_time_start;
+					rev_time_start = sensor_end_time;
+					rev_timer_overflow_count = 0;
+				}   
+			}
 		}
-    }
-    start_time = end_time;
+		start_time = end_time;
 }
 #define AVERAGE_COUNT	(4)
 uint16_t actual_revs_history[AVERAGE_COUNT];
@@ -365,7 +365,7 @@ void two_second_constant(int drive_value) {
   
 
 /**
- * For the tiny85, PB2 (pin 7) is the RX input, PB3 (pin 2) is the servo output, and PB1 (pin 6, AIN1) is reserved for the sensor input
+ * For the tiny84, PB2 (pin 5) is the RX input, PB0 (pin 2) is the servo output, and PA2 (pin 11, AIN1) is the sensor input
  * PB4 (pin 3) is the diagnostic LED output
  */
 int main(void)
@@ -377,12 +377,12 @@ int main(void)
     DDRA = (1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs
     PORTA = 0x00;
     PORTB = 0x00;
-    
+    PCMSK0 = (1 << PCINT2); // set pin change interrupts on PCINT2
     // set the analog comparator to use the internal reference and enable interrupt on rising edge
-    ACSR = (1 << ACBG) | (1 << ACIE) | (1 << ACIS1) | (1 << ACIS0);
-    MCUCR = ISC0_RISE; // look for rising edge on INT0
-    // enable interrupt INT0
-    GIMSK = (1 << INT0);
+    //ACSR = (1 << ACBG) | (1 << ACIE) | (1 << ACIS1) | (1 << ACIS0);
+    MCUCR = ISC0_RISE; // any change ISC0_RISE; // look for rising edge on INT0
+    // enable interrupt INT0 and PCIE0
+    GIMSK = (1 << INT0) | (1 << PCIE0);
     TIMSK1 = (1 << TOIE1) /*| (1 << OCIE1A) | (1 << OCIE1B)*/; // enable counter 1 overflow interrupt
     TCCR1B = 0x03; // CK/64, i.e. 125KHz (0.008ms), or 488Hz MSB or 1.9Hz overflow.
     //red(1);
