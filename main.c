@@ -308,6 +308,9 @@ uint16_t sensor_end_time = 0;
 #define ROTATIONS_PER_CALC	UINT16_C(1)
 ISR(PCINT0_vect)
 {
+	static uint8_t oldValue = 0;
+	uint8_t newValue = PINA;
+	if (((oldValue ^ newValue) & (1 << SENSOR_P)) && (newValue & (1 << SENSOR_P))) {
 		static uint8_t rotation_count = 0;
 		static uint16_t start_time = 0;
 		static uint16_t end_time = 0;
@@ -329,6 +332,8 @@ ISR(PCINT0_vect)
 			}
 		}
 		start_time = end_time;
+	}
+	oldValue = newValue;
 }
 #define AVERAGE_COUNT	(4)
 uint16_t actual_revs_history[AVERAGE_COUNT];
