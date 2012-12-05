@@ -2,6 +2,7 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <stdint.h>
+#include "motor.h"
 
 #define RX_DD	(DDB2)
 #define RX_P	(PB2) // Must be INT0 pin
@@ -18,6 +19,7 @@
 #define LED2_DD (DDA0)
 #define LED2_P (PA0)
 
+
 void red(uint8_t on) {
 	if (on) {
 		PORTA &= ~(1 << LED1_P);
@@ -33,6 +35,11 @@ void green(uint8_t on) {
 		PORTA |= (1 << LED2_P);
 	}
 }
+
+ESC escs[] = {
+{B, PB0, STOP_SPEED},
+{A, PA7, STOP_SPEED}
+};
 
 #define ISC0_RISE (0x03)
 #define ISC0_FALL (0x02)
@@ -148,8 +155,6 @@ void debugToggle() {
     //PORTB ^= (1 << PB4);
 }
 
-#define MAX_SPEED INT16_C(240)
-#define STOP_SPEED INT16_C(120)
 
 #define MAX_RPS INT16_C(50)
 
@@ -209,12 +214,12 @@ void doCycle() {
 	}
 }
 
-ISR(TIM1_COMPA_vect) 
+/*ISR(TIM1_COMPA_vect) 
 {
 	TIMSK1 &= ~(1 << OCIE1A);
 	PORTB &= ~(1 << MOTOR_P);
 	//red(0);
-}
+}*/
 
 uint16_t timer_diff(uint16_t start, uint16_t end) {
 	if (start > end) {
@@ -314,7 +319,6 @@ ISR(PCINT0_vect)
 		static uint8_t rotation_count = 0;
 		static uint16_t start_time = 0;
 		static uint16_t end_time = 0;
-		static uint8_t counter = 0;
 		end_time = TCNT1L;
 		end_time += TCNT1H << 8;
 		if (start_time != 0) {
@@ -473,7 +477,9 @@ int main(void)
                 drive = STOP_SPEED;
             }
         }
-        doCycle();
+        escs[0].drive = drive;
+        escs[1].drive = drive;
+        serviceEscs(escs, 2);
     }
     return 0;   /* never reached */
 }
