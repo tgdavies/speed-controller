@@ -1,4 +1,3 @@
-#define MAX_MOTORS	(4)
 #define AVERAGE_COUNT (4)
 
 #define MAX_SPEED INT16_C(240)
@@ -29,5 +28,5 @@ typedef struct _esc {
 #define clearBit(port, bit) if (port == A) { PORTA &= ~(1 << bit); } else { PORTB &= ~(1 << bit); } 
 #define testBit(var, port, bit) if (port == A) { var = PORTA & (1 << bit); } else { var = PORTB & (1 << bit); } 
 
-void serviceEscs(ESC escs[], uint8_t count);
+void serviceEscs(ESC escs[]);
 

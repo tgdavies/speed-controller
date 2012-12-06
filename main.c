@@ -479,7 +479,7 @@ int main(void)
         }
         escs[0].drive = drive;
         escs[1].drive = drive;
-        serviceEscs(escs, 2);
+        serviceEscs(escs);
     }
     return 0;   /* never reached */
 }

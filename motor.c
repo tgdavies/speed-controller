@@ -5,7 +5,9 @@
 #include "avrutils.h"
 #include "motor.h"
 
-
+#ifndef NO_OF_MOTORS
+	#error "'NO_OF_MOTORS' is not defined."
+#endif
 
 uint8_t motor_i = 0;
 ESC* all_escs;
@@ -20,31 +22,21 @@ void setCompare(uint16_t time) {
 }
 
 
-uint8_t indexes[MAX_MOTORS];
+uint8_t indexes[NO_OF_MOTORS];
 
-void serviceEscs(ESC escs[], uint8_t count) {
+extern void sort();
+
+void serviceEscs(ESC escs[]) {
 	all_escs = escs;
-	/*for (int i = 0; i < count; ++i) {
-		indexes[i] = 0;
-		for (int j = 0; j < count; ++j) {
-			if (
-				i != j &&
-				(
-					(escs[i].drive > escs[j].drive) ||
-					((escs[i].drive == escs[j].drive) && (i > j))
-				)) {
-				indexes[i]++;
-			}
-		}
-	}*/
+	sort();
 	// assume MAX_MOTORS and count are both 2
-	if (escs[0].drive > escs[1].drive) {
+	/*if (escs[0].drive > escs[1].drive) {
 		indexes[0] = 1; indexes[1] = 0;
 	} else if (escs[1].drive >= escs[0].drive) {
 		indexes[1] = 1; indexes[0] = 0;
-	}
+	}*/
 	motor_i = 0;
-	for (uint8_t i = 0; i < count; ++i) {
+	for (uint8_t i = 0; i < NO_OF_MOTORS; ++i) {
 			setBit(escs[i].port, escs[i].pin);
 	}
 	setCompare((1000/8) + (escs[indexes[0]].drive >> 1));
@@ -57,7 +49,7 @@ ISR(TIM1_COMPA_vect)
 {
 	ESC* esc = &all_escs[indexes[motor_i++]];
 	clearBit(esc->port, esc->pin);
-	while (motor_i < MAX_MOTORS) {
+	while (motor_i < NO_OF_MOTORS) {
 		ESC* esc2 = &all_escs[indexes[motor_i]];
 		uint8_t diff = esc2->drive - esc->drive;
 		if (diff == 0) {
@@ -70,7 +62,7 @@ ISR(TIM1_COMPA_vect)
 			break;
 		}
 	}
-	if (motor_i == MAX_MOTORS) {
+	if (motor_i == NO_OF_MOTORS) {
 		TIMSK1 &= ~(1 << OCIE1A);
 	}
 }

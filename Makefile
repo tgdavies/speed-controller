@@ -21,8 +21,10 @@
 DEVICE     = attiny84
 CLOCK      = 8000000
 PROGRAMMER = -c usbtiny
-OBJECTS    = main.o usiTwiSlave.o morse.o motor.o
+OBJECTS    = main.o usiTwiSlave.o morse.o motor.o sort.o
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
+
+PARAMS=-DNO_OF_MOTORS=2
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
 # Example for 8 MHz internal oscillator
@@ -50,7 +52,7 @@ FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
 # Tune the lines below only if you know what you are doing:
 
 AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
-COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -std=c99
+COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -std=c99 $(PARAMS)
 
 # symbolic targets:
 all:	main.hex
@@ -101,3 +103,9 @@ disasm:	main.elf
 
 cpp:
 	$(COMPILE) -E main.c
+	
+# Targets for running tests -- using gcc, not avr-gcc
+
+testsort: testsort.c sort.c
+	gcc -DNO_OF_MOTORS=4 --std=c99 sort.c testsort.c -o testsort
+	./testsort
