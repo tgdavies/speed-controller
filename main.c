@@ -190,36 +190,6 @@ void delay_us(uint16_t delay) {
 	BIT_DELAY_US(delay, 0x02);
 	BIT_DELAY_US(delay, 0x01);
 }
-void doCycle() {
-	uint16_t start_time;
-	readCNT1(start_time);
-	uint16_t end_time = start_time + (1000/8) + (drive >> 1);
-	OCR1AH = end_time >> 8;
-	OCR1AL = end_time;
-//red(1);
-    PORTB |= (1 << MOTOR_P);
-    TIMSK1 |= (1 << OCIE1A);
-    //_delay_us(1000);
-    //delay_us(drive * 4);
-    //PORTB &= ~(1 << MOTOR_P);
-    //delay_us((MAX_SPEED - drive) * 4);
-    /*if (sendDebug) {
-		for (i = 0; i < DEBUG_CHARS_SIZE; ++i) {
-			softUartSendChar(debugChars[i]);
-		}
-		sendDebug = 0;
-		clearDebugChars();
-	} else*/ {
-	    _delay_ms(20);
-	}
-}
-
-/*ISR(TIM1_COMPA_vect) 
-{
-	TIMSK1 &= ~(1 << OCIE1A);
-	PORTB &= ~(1 << MOTOR_P);
-	//red(0);
-}*/
 
 uint16_t timer_diff(uint16_t start, uint16_t end) {
 	if (start > end) {
@@ -365,9 +335,12 @@ void process_sensor_result() {
 }
 
 void two_second_constant(int drive_value) {
+	for (uint8_t i = 0; i < NO_OF_MOTORS; ++i) {
+		escs[i].drive = drive_value;
+	}
 	drive = drive_value;
 	for (int i = 0; i < 100; ++i) {
-        doCycle();
+        serviceEscs(escs);
     }
 }
 
