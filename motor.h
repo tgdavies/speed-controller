@@ -3,30 +3,26 @@
 #define MAX_SPEED INT16_C(240)
 #define STOP_SPEED INT16_C(120)
 
-#define A	(1)
-#define B	(2)
-
-typedef struct _motor {
-	uint8_t sensePort;
-	uint8_t sensePortPin;
-	uint16_t revTimeStart;
-	uint8_t revTimerOverflowCount;
-	uint8_t rotation_count;
-	uint16_t start_time;
-	uint16_t end_time;
-	uint16_t actual_revs_history[AVERAGE_COUNT];
-	uint8_t average_index;
-} MOTOR;
-
 typedef struct _esc {
 	uint8_t port;
 	uint8_t pin;
 	uint8_t drive;
 } ESC;
 
-#define setBit(port, bit) if (port == A) { PORTA |= (1 << bit); } else { PORTB |= (1 << bit); } 
-#define clearBit(port, bit) if (port == A) { PORTA &= ~(1 << bit); } else { PORTB &= ~(1 << bit); } 
-#define testBit(var, port, bit) if (port == A) { var = PORTA & (1 << bit); } else { var = PORTB & (1 << bit); } 
+/**
+ * Set up the output pins for the ESCs
+ * This *must* be called first
+ */
+void setupEscs(ESC escs[]);
 
-void serviceEscs(ESC escs[]);
+
+/**
+ * Send the ESC a servo control signal, then delay for 20ms
+ */
+void serviceEscs();
+
+/**
+ * Send the ESCs the max forward, max backwards and center signals
+ */
+void calibrateEscs();
 

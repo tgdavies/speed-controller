@@ -12,7 +12,7 @@
 uint8_t motor_i = 0;
 ESC* all_escs;
 
-void setCompare(uint16_t time) {
+static void setCompare(uint16_t time) {
 	uint16_t start_time;
 	readCNT1(start_time);
 	uint16_t end_time = start_time + time;
@@ -26,8 +26,35 @@ uint8_t indexes[NO_OF_MOTORS];
 
 extern void sort();
 
-void serviceEscs(ESC escs[]) {
+void setupEscs(ESC escs[]) {
 	all_escs = escs;
+	for (uint8_t i = 0; i < NO_OF_MOTORS; ++i) {
+		setDDRBit(all_escs[i].port, all_escs[i].pin);
+	}
+}
+
+
+static void two_second_constant(int drive_value) {
+	for (uint8_t i = 0; i < NO_OF_MOTORS; ++i) {
+		all_escs[i].drive = drive_value;
+	}
+	for (int i = 0; i < 100; ++i) {
+        serviceEscs(all_escs);
+    }
+}
+
+void calibrateEscs() {
+	two_second_constant(MAX_SPEED);
+    two_second_constant(MAX_SPEED);
+    two_second_constant(0);
+    two_second_constant(0);
+    two_second_constant(MAX_SPEED/2);
+    two_second_constant(MAX_SPEED/2);
+    two_second_constant(MAX_SPEED/2);
+    two_second_constant(MAX_SPEED/2);
+}
+
+void serviceEscs() {
 	sort();
 	// assume MAX_MOTORS and count are both 2
 	/*if (escs[0].drive > escs[1].drive) {
@@ -37,13 +64,11 @@ void serviceEscs(ESC escs[]) {
 	}*/
 	motor_i = 0;
 	for (uint8_t i = 0; i < NO_OF_MOTORS; ++i) {
-			setBit(escs[i].port, escs[i].pin);
+			setBit(all_escs[i].port, all_escs[i].pin);
 	}
-	setCompare((1000/8) + (escs[indexes[0]].drive >> 1));
+	setCompare((1000/8) + (all_escs[indexes[0]].drive >> 1));
 	_delay_ms(20);
 }
-
-
 
 ISR(TIM1_COMPA_vect) 
 {

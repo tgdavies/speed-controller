@@ -2,6 +2,8 @@
 #include <util/delay.h>
 #include <avr/interrupt.h>
 #include <stdint.h>
+#include "avrutils.h"
+#include "brushlesssensor.h"
 #include "motor.h"
 
 #define RX_DD	(DDB2)
@@ -36,10 +38,7 @@ void green(uint8_t on) {
 	}
 }
 
-ESC escs[] = {
-{B, PB0, STOP_SPEED},
-{A, PA7, STOP_SPEED}
-};
+
 
 #define ISC0_RISE (0x03)
 #define ISC0_FALL (0x02)
@@ -191,13 +190,7 @@ void delay_us(uint16_t delay) {
 	BIT_DELAY_US(delay, 0x01);
 }
 
-uint16_t timer_diff(uint16_t start, uint16_t end) {
-	if (start > end) {
-		return 0xffff - start + end;
-	} else {
-		return end - start;
-	}
-}
+
 
 uint16_t debug_error = 0;
 uint16_t rx_signal_start_time = 0;
@@ -280,69 +273,7 @@ ISR(TIM1_OVF_vect) {
 uint16_t sensor_start_time = 0;
 uint16_t sensor_end_time = 0;
 
-#define ROTATIONS_PER_CALC	UINT16_C(1)
-ISR(PCINT0_vect)
-{
-	static uint8_t oldValue = 0;
-	uint8_t newValue = PINA;
-	if (((oldValue ^ newValue) & (1 << SENSOR_P)) && (newValue & (1 << SENSOR_P))) {
-		static uint8_t rotation_count = 0;
-		static uint16_t start_time = 0;
-		static uint16_t end_time = 0;
-		end_time = TCNT1L;
-		end_time += TCNT1H << 8;
-		if (start_time != 0) {
-			uint16_t diff = timer_diff(start_time, end_time);
-			if (diff > 50) {
-				//red((counter++) & 0x01);
-				++rotation_count;
-				if (rotation_count == 6) { // we've done 1 revolutions, see how long it took in 1/125000ths of a second
-					rotation_count = 0;
-					sensor_end_time = end_time;
-					sensor_start_time = rev_time_start;
-					rev_time_start = sensor_end_time;
-					rev_timer_overflow_count = 0;
-				}   
-			}
-		}
-		start_time = end_time;
-	}
-	oldValue = newValue;
-}
-#define AVERAGE_COUNT	(4)
-uint16_t actual_revs_history[AVERAGE_COUNT];
-uint8_t average_index = 0;
 
-void process_sensor_result() {
-	static uint8_t counter = 0;
-	if (rev_timer_overflow_count > 1) {
-		actual_revs_per_second = 0;
-		sensor_start_time = 0;
-		sensor_end_time = 0;
-	} else if (sensor_start_time != 0 && sensor_end_time != 0) {
-		uint16_t actual_time_per_rev = timer_diff(sensor_start_time, sensor_end_time);
-		if (actual_time_per_rev > 200) {
-		    //green(1);
-			actual_time_per_rev >>= 2;
-			//actual_revs_per_second = (ROTATIONS_PER_CALC * UINT16_C(125000/4)) / actual_time_per_rev;
-			actual_revs_history[average_index++] = (ROTATIONS_PER_CALC * UINT16_C(125000/4)) / actual_time_per_rev;
-			average_index &= 0x3;
-			actual_revs_per_second = (actual_revs_history[0] + actual_revs_history[1] + actual_revs_history[2] + actual_revs_history[3]) >> 2;
-			//green(0);
-			sensor_start_time = sensor_end_time = 0;
-		}
-	}
-}
-
-void two_second_constant(int drive_value) {
-	for (uint8_t i = 0; i < NO_OF_MOTORS; ++i) {
-		escs[i].drive = drive_value;
-	}
-	drive = drive_value;
-	for (int i = 0; i < 100; ++i) {
-        serviceEscs(escs);
-    }
-}
 
   
 
@@ -352,40 +283,39 @@ void two_second_constant(int drive_value) {
  */
 int main(void)
 {
+	ESC escs[] = {
+	{B, PB0, STOP_SPEED},
+	{A, PA7, STOP_SPEED}
+	};
+	
+	SENSOR sensors[2];
+	sensor[0].port = A;
+	sensor[0].pin = PA2;
+	sensor[1].port = A;
+	sensor[1].pin = PA3;
     // set the clock prescaler to 1 to get us an 8MHz clock -- the CKDIV8 fuse is programmed by default, so initial prescaler is /8
     CLKPR = 0x80;
     CLKPR = 0x00;
-    DDRB = (1 << MOTOR_DD); // outputs for servo
-    DDRA = (1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs
+    //DDRB = (1 << MOTOR_DD); // output for motor 1
+    DDRA = (1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs and motor 2
     PORTA = 0x00;
     PORTB = 0x00;
-    PCMSK0 = (1 << PCINT2); // set pin change interrupts on PCINT2
+    //PCMSK0 = (1 << PCINT2); // set pin change interrupts on PCINT2
     // set the analog comparator to use the internal reference and enable interrupt on rising edge
     //ACSR = (1 << ACBG) | (1 << ACIE) | (1 << ACIS1) | (1 << ACIS0);
     MCUCR = ISC0_RISE; // any change ISC0_RISE; // look for rising edge on INT0
-    // enable interrupt INT0 and PCIE0
-    GIMSK = (1 << INT0) | (1 << PCIE0);
+    // enable interrupt INT0 for RX signal
+    GIMSK = (1 << INT0);
     TIMSK1 = (1 << TOIE1) /*| (1 << OCIE1A) | (1 << OCIE1B)*/; // enable counter 1 overflow interrupt
     TCCR1B = 0x03; // CK/64, i.e. 125KHz (0.008ms), or 488Hz MSB or 1.9Hz overflow.
     //red(1);
     //green(1);
 	drive = MAX_SPEED/2;
 	// initialise the ESC with a central setting
+	setupEscs(escs);
 	sei();
-	red(0);
-	green(0);
-    two_second_constant(MAX_SPEED);
-    two_second_constant(MAX_SPEED);
-    red(1);
-    two_second_constant(0);
-    two_second_constant(0);
-    green(1);
-    two_second_constant(MAX_SPEED/2);
-    two_second_constant(MAX_SPEED/2);
-    two_second_constant(MAX_SPEED/2);
-    two_second_constant(MAX_SPEED/2);
-    green(0);
-    red(0);
+	calibrateEscs();
+	setupSensors(sensors);
 	uint8_t pid_cycle_counter = 0;
 	uint8_t previous_desired_direction = AHEAD;
 	
@@ -452,7 +382,7 @@ int main(void)
         }
         escs[0].drive = drive;
         escs[1].drive = drive;
-        serviceEscs(escs);
+        serviceEscs();
     }
     return 0;   /* never reached */
 }

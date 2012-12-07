@@ -21,10 +21,11 @@
 DEVICE     = attiny84
 CLOCK      = 8000000
 PROGRAMMER = -c usbtiny
-OBJECTS    = main.o usiTwiSlave.o morse.o motor.o sort.o
+OBJECTS    = main.o usiTwiSlave.o morse.o motor.o sort.o brushlesssensor.o
+HEADERS	= avrutils.h motor.h brushlesssensor.h
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
 
-PARAMS=-DNO_OF_MOTORS=2
+PARAMS=-DNO_OF_MOTORS=2 -DNO_OF_SENSORS=2
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
 # Example for 8 MHz internal oscillator
@@ -56,6 +57,8 @@ COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -std=c99 $(PARAMS)
 
 # symbolic targets:
 all:	main.hex
+
+$(OBJECTS): $(HEADERS)
 
 .c.o:
 	$(COMPILE) -c $< -o $@
