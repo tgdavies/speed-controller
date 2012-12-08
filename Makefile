@@ -21,7 +21,8 @@
 DEVICE     = attiny84
 CLOCK      = 8000000
 PROGRAMMER = -c usbtiny
-OBJECTS    = main.o usiTwiSlave.o morse.o motor.o sort.o brushlesssensor.o
+OBJECTS    = main.o motor.o sort.o brushlesssensor.o avrutils.o
+# usiTwiSlave.o morse.o 
 HEADERS	= avrutils.h motor.h brushlesssensor.h
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
 
@@ -52,7 +53,7 @@ PARAMS=-DNO_OF_MOTORS=2 -DNO_OF_SENSORS=2
 
 # Tune the lines below only if you know what you are doing:
 
-AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
+AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE) -B 3
 COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -std=c99 $(PARAMS)
 
 # symbolic targets:

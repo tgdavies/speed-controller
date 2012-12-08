@@ -14,5 +14,21 @@
 
 #define enablePCINT(port, bit) if (port == A) { PCMSK0 |= (1 << bit); } else { PCMSK1 |= (1 << bit); } 
 
+#define LED1_DD (DDA1)
+#define LED1_P (PA1)
+#define LED2_DD (DDA0)
+#define LED2_P (PA0)
 
-uint16_t timer_diff(uint16_t start, uint16_t end);
+#define red(on) if (on) { \
+		PORTA &= ~(1 << LED1_P); \
+	} else { \
+		PORTA |= (1 << LED1_P); \
+	}
+
+#define green(on) if (on) { \
+		PORTA &= ~(1 << LED2_P); \
+	} else { \
+		PORTA |= (1 << LED2_P); \
+	}
+	
+#define timer_diff(start, end) (start > end) ? (0xffff - start + end) : (end - start)

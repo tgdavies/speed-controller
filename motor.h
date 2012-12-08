@@ -1,7 +1,7 @@
 #define AVERAGE_COUNT (4)
 
-#define MAX_SPEED INT16_C(240)
-#define STOP_SPEED INT16_C(120)
+#define MAX_SPEED UINT8_C(240)
+#define STOP_SPEED UINT8_C(120)
 
 typedef struct _esc {
 	uint8_t port;
@@ -13,7 +13,7 @@ typedef struct _esc {
  * Set up the output pins for the ESCs
  * This *must* be called first
  */
-void setupEscs(ESC escs[]);
+void setupEscs();
 
 
 /**

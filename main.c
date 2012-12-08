@@ -21,25 +21,6 @@
 #define LED2_DD (DDA0)
 #define LED2_P (PA0)
 
-
-void red(uint8_t on) {
-	if (on) {
-		PORTA &= ~(1 << LED1_P);
-	} else {
-		PORTA |= (1 << LED1_P);
-	}
-}
-
-void green(uint8_t on) {
-	if (on) {
-		PORTA &= ~(1 << LED2_P);
-	} else {
-		PORTA |= (1 << LED2_P);
-	}
-}
-
-
-
 #define ISC0_RISE (0x03)
 #define ISC0_FALL (0x02)
 
@@ -165,7 +146,7 @@ void debugToggle() {
 volatile int16_t speed = 0;
 
 // time to drive the motor in multiples of 4us
-volatile uint16_t drive = STOP_SPEED;
+volatile uint8_t drive = STOP_SPEED;
 
 // really revs per second / 10
 volatile uint16_t actual_revs_per_second = 0;
@@ -263,19 +244,15 @@ void process_rx_result() {
 	}
 }
 
-uint16_t rev_time_start = 0;
-uint8_t rev_timer_overflow_count = 0;
-
-ISR(TIM1_OVF_vect) {
-	++rev_timer_overflow_count;
-}
-
-uint16_t sensor_start_time = 0;
-uint16_t sensor_end_time = 0;
 
 
-
-  
+ESC all_escs[2];
+	
+SENSOR all_sensors[2];
+	uint8_t pid_cycle_counter = 0;
+	uint8_t previous_desired_direction = AHEAD;
+    uint16_t previous_desired_revs_per_second = 0;
+    int16_t integral = 0;
 
 /**
  * For the tiny84, PB2 (pin 5) is the RX input, PB0 (pin 2) is the servo output, and PA2 (pin 11, AIN1) is the sensor input
@@ -283,21 +260,20 @@ uint16_t sensor_end_time = 0;
  */
 int main(void)
 {
-	ESC escs[] = {
-	{B, PB0, STOP_SPEED},
-	{A, PA7, STOP_SPEED}
-	};
-	
-	SENSOR sensors[2];
-	sensor[0].port = A;
-	sensor[0].pin = PA2;
-	sensor[1].port = A;
-	sensor[1].pin = PA3;
     // set the clock prescaler to 1 to get us an 8MHz clock -- the CKDIV8 fuse is programmed by default, so initial prescaler is /8
     CLKPR = 0x80;
     CLKPR = 0x00;
+	
+	all_sensors[0].port = A;
+	all_sensors[0].pin = PA2;
+	all_sensors[1].port = A;
+	all_sensors[1].pin = PA3;
+	all_escs[0].port = B;
+	all_escs[0].pin = PB0;
+	all_escs[1].port = A;
+	all_escs[1].pin = PA7;
     //DDRB = (1 << MOTOR_DD); // output for motor 1
-    DDRA = (1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs and motor 2
+    DDRA |= (1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs and motor 2
     PORTA = 0x00;
     PORTB = 0x00;
     //PCMSK0 = (1 << PCINT2); // set pin change interrupts on PCINT2
@@ -305,36 +281,33 @@ int main(void)
     //ACSR = (1 << ACBG) | (1 << ACIE) | (1 << ACIS1) | (1 << ACIS0);
     MCUCR = ISC0_RISE; // any change ISC0_RISE; // look for rising edge on INT0
     // enable interrupt INT0 for RX signal
-    GIMSK = (1 << INT0);
-    TIMSK1 = (1 << TOIE1) /*| (1 << OCIE1A) | (1 << OCIE1B)*/; // enable counter 1 overflow interrupt
+    GIMSK |= (1 << INT0);
+    TIMSK1 |= (1 << TOIE1) /*| (1 << OCIE1A) | (1 << OCIE1B)*/; // enable counter 1 overflow interrupt
     TCCR1B = 0x03; // CK/64, i.e. 125KHz (0.008ms), or 488Hz MSB or 1.9Hz overflow.
-    //red(1);
-    //green(1);
-	drive = MAX_SPEED/2;
 	// initialise the ESC with a central setting
-	setupEscs(escs);
+	red(0);
+	green(0);
+	setupEscs();
 	sei();
 	calibrateEscs();
-	setupSensors(sensors);
-	uint8_t pid_cycle_counter = 0;
-	uint8_t previous_desired_direction = AHEAD;
-	
-    
+	green(1);
+	setupSensors();
+    red(1);
     desired_direction = 0;
     desired_revs_per_second = 0;
-    uint16_t previous_desired_revs_per_second = 0;
-    int16_t integral = 0;
-    uint8_t f1, f2;
     for (; ;) {
         process_rx_result();
-        process_sensor_result();
+        processSensors();
+        //process_sensor_result();
         //desired_direction = AHEAD;
         //desired_revs_per_second = 20;
         ++pid_cycle_counter;
 
         if (pid_cycle_counter > 15) { // do this every 40ms
-            debugOff();
+            //debugOff();
+            green(desired_revs_per_second > 5);
             pid_cycle_counter = 0;
+            actual_revs_per_second = all_sensors[0].actual_revs_per_second;
             if (desired_direction != previous_desired_direction) {
                 //pidInit();
                 previous_desired_direction = desired_direction;
@@ -359,7 +332,7 @@ int main(void)
             //if (integral < 0) { // WHY DOES THIS HELP?!?
             //    integral = 0;
             //}
-            green(diff < 10);
+            //green(diff < 10);
             //red(diff < 10);
             int16_t total = (desired_revs_per_second * 0.3) + integral;
             
@@ -380,8 +353,9 @@ int main(void)
                 drive = STOP_SPEED;
             }
         }
-        escs[0].drive = drive;
-        escs[1].drive = drive;
+        //drive = MAX_SPEED/2 + 30;
+        all_escs[0].drive = drive;
+        all_escs[1].drive = drive;
         serviceEscs();
     }
     return 0;   /* never reached */
