@@ -20,13 +20,13 @@
 #DEVICE     = at90s2313
 DEVICE     = attiny84
 CLOCK      = 8000000
-PROGRAMMER = -c usbtiny
-OBJECTS    = main.o motor.o sort.o brushlesssensor.o avrutils.o
+PROGRAMMER = -c avrisp2 -P usb:000200012345
+OBJECTS    = main.o motor.o sort.o brushlesssensor.o avrutils.o pid.o
 # usiTwiSlave.o morse.o 
-HEADERS	= avrutils.h motor.h brushlesssensor.h
+HEADERS	= avrutils.h motor.h brushlesssensor.h pid.h usi_uart.h
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
 
-PARAMS=-DNO_OF_MOTORS=2 -DNO_OF_SENSORS=2
+PARAMS=-DNO_OF_MOTORS=1 -DNO_OF_SENSORS=1
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
 # Example for 8 MHz internal oscillator
@@ -53,8 +53,8 @@ PARAMS=-DNO_OF_MOTORS=2 -DNO_OF_SENSORS=2
 
 # Tune the lines below only if you know what you are doing:
 
-AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE) -B 3
-COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -std=c99 $(PARAMS)
+AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
+COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE) -std=gnu99 $(PARAMS)
 
 # symbolic targets:
 all:	main.hex

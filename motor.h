@@ -1,4 +1,4 @@
-#define AVERAGE_COUNT (4)
+//#define AVERAGE_COUNT (4)
 
 #define MAX_SPEED UINT8_C(240)
 #define STOP_SPEED UINT8_C(120)

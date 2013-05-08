@@ -5,13 +5,13 @@
 #include "avrutils.h"
 #include "brushlesssensor.h"
 
-#ifndef NO_OF_SENSORS
-	#error "'NO_OF_SENSORS' is not defined."
-#endif
+//#ifndef NO_OF_SENSORS
+//	#error "'NO_OF_SENSORS' is not defined."
+//#endif
 #define ROTATIONS_PER_CALC	UINT16_C(1)
 
 
-extern SENSOR* all_sensors;
+extern SENSOR all_sensors[NO_OF_SENSORS];
 static uint8_t i,j,k;
 void setupSensors() {
 	//for (i = 0; i < NO_OF_SENSORS; ++i) {
@@ -27,13 +27,14 @@ void processSensors() {
 	for (i = 0; i < NO_OF_SENSORS; ++i) {
 		SENSOR* sensor = &all_sensors[i];
 		if (sensor->rev_timer_overflow_count > 1) {
+                    //green(1);
 			sensor->actual_revs_per_second = 0;
 			sensor->sensor_start_time = 0;
 			sensor->sensor_end_time = 0;
+                        sensor->rev_timer_overflow_count = 0;
 		} else if (sensor->sensor_start_time != 0 && sensor->sensor_end_time != 0) {
 			uint16_t actual_time_per_rev = timer_diff(sensor->sensor_start_time, sensor->sensor_end_time);
 			if (actual_time_per_rev > 200) {
-				//green(1);
 				actual_time_per_rev >>= 2;
 			#ifndef AVERAGE_COUNT
 				sensor->actual_revs_per_second = (ROTATIONS_PER_CALC * UINT16_C(125000/4)) / actual_time_per_rev;
@@ -66,14 +67,17 @@ ISR(PCINT0_vect)
 	for (k = 0; k < NO_OF_SENSORS; ++k) {
 		sensor = &all_sensors[k];
 		if (sensor->port == A && ((oldValue ^ newValue) & (1 << sensor->pin)) && (newValue & (1 << sensor->pin))) {
+
 			//static uint8_t rotation_count = 0;
 			//static uint16_t start_time = 0;
 			//static uint16_t end_time = 0;
 			sensor->end_time = TCNT1L;
 			sensor->end_time += TCNT1H << 8;
 			if (sensor->start_time != 0) {
+                                                                red(1);
+
 				diff = timer_diff(sensor->start_time, sensor->end_time);
-				if (diff > 50) {
+				//if (diff > 50) {
 					//red((counter++) & 0x01);
 					++sensor->rotation_count;
 					if (sensor->rotation_count == 6) { // we've done 1 revolutions, see how long it took in 1/125000ths of a second
@@ -83,7 +87,7 @@ ISR(PCINT0_vect)
 						sensor->rev_time_start = sensor->sensor_end_time;
 						sensor->rev_timer_overflow_count = 0;
 					}   
-				}
+				//}
 			}
 			sensor->start_time = sensor->end_time;
 		}

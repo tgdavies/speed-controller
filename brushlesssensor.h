@@ -1,4 +1,4 @@
-//#define AVERAGE_COUNT	(4)
+//#define AVERAGE_COUNT	(4) doesn't seem to improve performance :-(
 
 typedef struct _sensor {
 	uint8_t port;
