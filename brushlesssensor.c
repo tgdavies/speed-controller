@@ -45,8 +45,15 @@ void processSensors() {
 			#endif
 				//green(0);
 				sensor->sensor_start_time = sensor->sensor_end_time = 0;
+                                sensor->no_result_count = 0;
 			}
-		}
+
+		} else {
+                    if (sensor->no_result_count++ > 20) {
+                        sensor->actual_revs_per_second = 0;
+                        sensor->no_result_count = 0;
+                    }
+                }
 	}
 }
 
@@ -74,7 +81,6 @@ ISR(PCINT0_vect)
 			sensor->end_time = TCNT1L;
 			sensor->end_time += TCNT1H << 8;
 			if (sensor->start_time != 0) {
-                                                                red(1);
 
 				diff = timer_diff(sensor->start_time, sensor->end_time);
 				//if (diff > 50) {

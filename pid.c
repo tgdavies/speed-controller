@@ -20,7 +20,7 @@ static int16_t total;
 void processPids() {
 	++i;
 	
-	if (i > 40) { // do this every 200ms
+	if (i > 10) { // do this every 200ms
 		//debugOff();
 		for (i = 0; i < NO_OF_MOTORS; ++i) { //NB we are using i for two things
 			pid = &all_pids[i];
@@ -46,7 +46,7 @@ void processPids() {
 			//if (integral < 0) { // WHY DOES THIS HELP?!?
 			//    integral = 0;
 			//}
-                        green(desired_revs_per_second > 25);
+                        //green(desired_revs_per_second > 25);
 			total = desired_revs_per_second * 10;
 			total = (desired_revs_per_second / 3) + pid->integral;
 			

@@ -20,8 +20,9 @@
 #DEVICE     = at90s2313
 DEVICE     = attiny84
 CLOCK      = 8000000
-PROGRAMMER = -c avrisp2 -P usb:000200012345
-OBJECTS    = main.o motor.o sort.o brushlesssensor.o avrutils.o pid.o
+#PROGRAMMER = -c avrisp2 -P usb:000200012345
+PROGRAMMER = -c buspirate -P /dev/tty.PL2303-000014FA
+OBJECTS    = main.o motor.o sort.o brushlesssensor.o avrutils.o pid.o USI_TWI_Slave.o
 # usiTwiSlave.o morse.o 
 HEADERS	= avrutils.h motor.h brushlesssensor.h pid.h usi_uart.h
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m

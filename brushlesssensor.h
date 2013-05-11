@@ -10,6 +10,7 @@ typedef struct _sensor {
 	uint16_t end_time;
 	uint16_t sensor_start_time;
 	uint16_t sensor_end_time;
+        uint8_t no_result_count;
 #ifdef AVERAGE_COUNT
 	uint16_t actual_revs_history[AVERAGE_COUNT];
 	uint8_t average_index;

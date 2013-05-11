@@ -213,7 +213,7 @@ void process_rx_result() {
             speed = RX_COUNT_STOP;
         } else if (v > RX_COUNTS_PER_MS * 2) {
             speed = RX_COUNTS_PER_MS;
-        } else if (v < RX_COUNTS_PER_MS) {            
+        } else if (v < RX_COUNTS_PER_MS) {
             speed = 0;
         } else {
             speed = v - RX_COUNTS_PER_MS;
@@ -247,6 +247,12 @@ ESC all_escs[2];
 SENSOR all_sensors[2];
 
 PID all_pids[2];
+
+uint8_t count = 0;
+
+extern uint8_t rxBuf[];
+extern uint8_t txBuf[];
+
 
 /*	uint8_t pid_cycle_counter = 0;
         uint8_t previous_desired_direction = AHEAD;
@@ -286,80 +292,30 @@ int main(void) {
     red(1);
     green(0);
     setupEscs();
+    usiTwiSlaveInit(0x10);
     sei();
     calibrateEscs();
     green(1);
     setupSensors();
     red(1);
+
     desired_direction = 0;
     desired_revs_per_second = 0;
+    rxBuf[1] = 0;
     for (;;) {
+        
         process_rx_result();
+        if (rxBuf[0]) {
+            desired_direction = (rxBuf[0] & 0x80) ? AHEAD : ASTERN;
+            desired_revs_per_second = rxBuf[0] & 0x7f;
+        }
+        green(rxBuf[1]);
         processSensors();
         processPids();
-        /*uint8_t d = MAX_SPEED/2 + desired_revs_per_second * (desired_direction == AHEAD ? 1 : -1);
-        all_escs[0].drive = d;
-        all_escs[1].drive = d;*/
+
         serviceEscs();
-        red(0);
-        //process_sensor_result();
-        //desired_direction = AHEAD;
-        //desired_revs_per_second = 20;
-        /*++pid_cycle_counter;
-
-        if (pid_cycle_counter > 15) { // do this every 40ms
-            //debugOff();
-            green(desired_revs_per_second > 5);
-            pid_cycle_counter = 0;
-            actual_revs_per_second = all_sensors[0].actual_revs_per_second;
-            if (desired_direction != previous_desired_direction) {
-                //pidInit();
-                previous_desired_direction = desired_direction;
-                integral = 0;
-            }
-            if (previous_desired_revs_per_second != desired_revs_per_second) {
-                //integral = 0;
-                previous_desired_revs_per_second = desired_revs_per_second;
-            }
-
-            int8_t diff = desired_revs_per_second - actual_revs_per_second;
-            if (diff < 0) diff = -diff;
-            
-            if (diff > 5) { // don't react to noise
-                int8_t delta = (diff >> 3) + 1;
-                if (desired_revs_per_second < actual_revs_per_second) {
-                    integral -= delta;
-                } else if (desired_revs_per_second > actual_revs_per_second) {
-                    integral += delta;
-                }
-            }
-            //if (integral < 0) { // WHY DOES THIS HELP?!?
-            //    integral = 0;
-            //}
-            //green(diff < 10);
-            //red(diff < 10);
-            int16_t total = (desired_revs_per_second * 0.3) + integral;
-            
-            // restrict value to the allowed range
-            if (total < 0) {
-                total = 0;
-            } else if (total > MAX_SPEED / 2) {
-                total = MAX_SPEED / 2;
-            }
-
-            
-            // convert to an ESC output value, depending on current direction
-            if (desired_direction == AHEAD) {
-                drive = total + MAX_SPEED / 2;
-            } else if (desired_direction == ASTERN) {
-                drive = MAX_SPEED / 2 - total;
-            } else {
-                drive = STOP_SPEED;
-            }
-        }
-        //drive = MAX_SPEED/2 + 30;
-        all_escs[0].drive = drive;
-        all_escs[1].drive = drive;*/
+        ++count;
+        
     }
     return 0; /* never reached */
 }
