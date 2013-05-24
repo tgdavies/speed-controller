@@ -18,57 +18,48 @@ static int16_t diff;
 static int16_t total;
 
 void processPids() {
-	++i;
-	
-	if (i > 10) { // do this every 200ms
-		//debugOff();
-		for (i = 0; i < NO_OF_MOTORS; ++i) { //NB we are using i for two things
-			pid = &all_pids[i];
-			if (desired_direction != previous_desired_direction) {
-				pid->integral = 0;
-			}
-			//if (previous_desired_revs_per_second != desired_revs_per_second) {
-				//integral = 0;
-				//previous_desired_revs_per_second = desired_revs_per_second;
-			//}
-	
-			diff = desired_revs_per_second - all_sensors[i].actual_revs_per_second;
-			if (diff < 0) diff = -diff;
-			
-			if (diff > 5) { // don't react to noise
-				diff = (diff >> 3) + 1;
-				if (desired_revs_per_second < all_sensors[i].actual_revs_per_second) {
-					pid->integral -= diff;
-				} else if (desired_revs_per_second > all_sensors[i].actual_revs_per_second) {
-					pid->integral += diff;
-				}
-			}
-			//if (integral < 0) { // WHY DOES THIS HELP?!?
-			//    integral = 0;
-			//}
-                        //green(desired_revs_per_second > 25);
-			total = desired_revs_per_second * 10;
-			total = (desired_revs_per_second / 3) + pid->integral;
-			
-			// restrict value to the allowed range
-			if (total < 0) {
-				total = 0;
-			} else if (total > MAX_SPEED / 2) {
-				total = MAX_SPEED / 2;
-			}
-	
-			
-			// convert to an ESC output value, depending on current direction
-			if (desired_direction == AHEAD) {
-				all_escs[i].drive = total + MAX_SPEED / 2;
-			} else if (desired_direction == ASTERN) {
-				all_escs[i].drive = MAX_SPEED / 2 - total;
-			} else {
-				all_escs[i].drive = STOP_SPEED;
-			}
-			//all_escs[i].drive = MAX_SPEED / 2 + 30;
-		}
-		previous_desired_direction = desired_direction;
-		i = 0;
-	}
+    ++i;
+
+    if (i > 10) { // do this every 200ms
+        for (i = 0; i < NO_OF_MOTORS; ++i) { //NB we are using i for two things
+            pid = &all_pids[i];
+            if (desired_direction != previous_desired_direction) {
+                pid->integral = 0;
+            }
+
+            diff = desired_revs_per_second - all_sensors[i].actual_revs_per_second;
+            if (diff < 0) diff = -diff;
+
+            if (diff > 5) { // don't react to noise
+                diff = (diff >> 3) + 1;
+                if (desired_revs_per_second < all_sensors[i].actual_revs_per_second) {
+                    pid->integral -= diff;
+                } else if (desired_revs_per_second > all_sensors[i].actual_revs_per_second) {
+                    pid->integral += diff;
+                }
+            }
+
+            total = desired_revs_per_second * 10;
+            total = (desired_revs_per_second / 3) + pid->integral;
+
+            // restrict value to the allowed range
+            if (total < 0) {
+                total = 0;
+            } else if (total > MAX_SPEED / 2) {
+                total = MAX_SPEED / 2;
+            }
+
+
+            // convert to an ESC output value, depending on current direction
+            if (desired_direction == AHEAD) {
+                all_escs[i].drive = total + MAX_SPEED / 2;
+            } else if (desired_direction == ASTERN) {
+                all_escs[i].drive = MAX_SPEED / 2 - total;
+            } else {
+                all_escs[i].drive = STOP_SPEED;
+            }
+        }
+        previous_desired_direction = desired_direction;
+        i = 0;
+    }
 }

@@ -276,19 +276,15 @@ int main(void) {
     all_escs[0].pin = PB0;
     all_escs[1].port = A;
     all_escs[1].pin = PA7;
-    //DDRB = (1 << MOTOR_DD); // output for motor 1
     DDRA |= (1 << LED1_DD) | (1 << LED2_DD); // outputs for diagnostic LEDs and motor 2
     PORTA = 0x00;
     PORTB = 0x00;
-    //PCMSK0 = (1 << PCINT2); // set pin change interrupts on PCINT2
-    // set the analog comparator to use the internal reference and enable interrupt on rising edge
-    //ACSR = (1 << ACBG) | (1 << ACIE) | (1 << ACIS1) | (1 << ACIS0);
+
     MCUCR = ISC0_RISE; // any change ISC0_RISE; // look for rising edge on INT0
     // enable interrupt INT0 for RX signal
     GIMSK |= (1 << INT0);
     TIMSK1 |= (1 << TOIE1) /*| (1 << OCIE1A) | (1 << OCIE1B)*/; // enable counter 1 overflow interrupt
     TCCR1B = 0x03; // CK/64, i.e. 125KHz (0.008ms), or 488Hz MSB or 1.9Hz overflow.
-    // initialise the ESC with a central setting
     red(1);
     green(0);
     setupEscs();
@@ -303,7 +299,7 @@ int main(void) {
     desired_revs_per_second = 0;
     rxBuf[1] = 0;
     for (;;) {
-        
+
         process_rx_result();
         if (rxBuf[0]) {
             desired_direction = (rxBuf[0] & 0x80) ? AHEAD : ASTERN;
@@ -322,7 +318,7 @@ int main(void) {
         txBuf[5] = all_escs[1].drive;
 
         ++count;
-        
+
     }
     return 0; /* never reached */
 }
