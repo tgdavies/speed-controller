@@ -314,6 +314,13 @@ int main(void) {
         processPids();
 
         serviceEscs();
+        txBuf[0] = desired_direction;
+        txBuf[1] = desired_revs_per_second & 0xff;
+        txBuf[2] = all_sensors[0].actual_revs_per_second & 0xff;
+        txBuf[3] = all_escs[0].drive;
+        txBuf[4] = all_sensors[1].actual_revs_per_second & 0xff;
+        txBuf[5] = all_escs[1].drive;
+
         ++count;
         
     }

@@ -2,7 +2,7 @@
 #include "motor.h"
 
 extern uint8_t indexes[NO_OF_MOTORS];
-extern ESC* all_escs;
+extern ESC all_escs[NO_OF_MOTORS];
 
 void sort() {
 	for (uint8_t i = 0; i < NO_OF_MOTORS; ++i) {

@@ -5,9 +5,9 @@
 #include "avrutils.h"
 #include "motor.h"
 
-#ifndef NO_OF_MOTORS
-	#error "'NO_OF_MOTORS' is not defined."
-#endif
+//#ifndef NO_OF_MOTORS
+//	#error "'NO_OF_MOTORS' is not defined."
+//#endif
 
 volatile uint8_t motor_i = 0;
 extern ESC all_escs[NO_OF_MOTORS];
@@ -58,6 +58,14 @@ void calibrateEscs() {
 
 void serviceEscs() {
 	sort();
+//        if (all_escs[0].drive <= all_escs[1].drive) {
+//            indexes[0] = 0;
+//            indexes[1] = 1;
+//        } else {
+//            indexes[0] = 1;
+//            indexes[1] = 0;       
+//        }
+
 	motor_i = 0;
 	for (j = 0; j < NO_OF_MOTORS; ++j) {
 		setBit(all_escs[j].port, all_escs[j].pin);

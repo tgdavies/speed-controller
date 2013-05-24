@@ -27,7 +27,7 @@ OBJECTS    = main.o motor.o sort.o brushlesssensor.o avrutils.o pid.o USI_TWI_Sl
 HEADERS	= avrutils.h motor.h brushlesssensor.h pid.h usi_uart.h
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0x24:m
 
-PARAMS=-DNO_OF_MOTORS=1 -DNO_OF_SENSORS=1
+PARAMS=-DNO_OF_MOTORS=2 -DNO_OF_SENSORS=2
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
 # Example for 8 MHz internal oscillator
